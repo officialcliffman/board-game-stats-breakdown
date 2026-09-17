@@ -1,13 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   LINEUP_MODES, activePlayers, buildGameCard, buildLineup, buildPlayerCards, playedGames,
 } from './lib/explore.js';
 import { buildGameSlides, buildLineupSlides, buildPlayerSlides } from './exploreSlides.jsx';
+import { buildCeremony } from './lib/awards.js';
+import { buildCeremonySlides } from './awardSlides.jsx';
 import Deck from './Deck.jsx';
 import { Avatar, Thumb, pct } from './ui.jsx';
 
 const TABS = [
   { id: 'lineups', label: 'Head to head' },
+  { id: 'awards', label: 'Awards' },
   { id: 'players', label: 'Players' },
   { id: 'games', label: 'Games' },
 ];
@@ -98,6 +101,103 @@ function LineupChooser({ raw, year, onOpen }) {
           >
             Show breakdown
             <small>{preview.plays} plays · {preview.table.length} players</small>
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+function AwardsChooser({ raw, year, onOpen }) {
+  const roster = useMemo(() => activePlayers(raw, { year }), [raw, year]);
+  const rosterIds = roster.map((r) => r.player.id);
+  const rosterKey = rosterIds.join(',');
+
+  // a ceremony wants the whole table by default
+  const [selected, setSelected] = useState(rosterIds);
+  const [mode, setMode] = useState('subset');
+
+  // Changing the year changes who was even playing, so re-enrol everyone rather
+  // than silently leaving out players the new range introduced.
+  useEffect(() => { setSelected(rosterKey ? rosterKey.split(',').map(Number) : []); }, [rosterKey]);
+
+  const available = new Set(rosterIds);
+  const picked = selected.filter((id) => available.has(id));
+  const allIn = picked.length === roster.length;
+
+  const ceremony = useMemo(
+    () => (picked.length >= 2 ? buildCeremony(raw, { playerIds: picked, mode, year }) : null),
+    [raw, picked.join(','), mode, year],
+  );
+
+  const toggle = (id) => setSelected((prev) => (
+    prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+  ));
+
+  return (
+    <>
+      <h2 className="title title--compact">Awards ceremony</h2>
+      <p className="chooser-hint">
+        A medal for every game, points on the board, and a winner at the end.
+      </p>
+      <div className="chooser-row">
+        <span className="chooser-hint">
+          {picked.length} of {roster.length} competing
+        </span>
+        <Chip active={false} onClick={() => setSelected(allIn ? [] : rosterIds)}>
+          {allIn ? 'Clear all' : 'Everyone'}
+        </Chip>
+      </div>
+      <div className="faces">
+        {roster.map(({ player, plays, isMe }) => (
+          <PlayerToggle
+            key={player.id}
+            player={player}
+            plays={plays}
+            isMe={isMe}
+            active={picked.includes(player.id)}
+            onClick={() => toggle(player.id)}
+          />
+        ))}
+      </div>
+
+      <h3 className="chooser-heading">Which plays count?</h3>
+      <div className="mode-list">
+        {LINEUP_MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className={`mode${mode === m.id ? ' is-active' : ''}`}
+            onClick={() => setMode(m.id)}
+          >
+            <strong>{m.label}</strong>
+            <small>{m.blurb}</small>
+          </button>
+        ))}
+      </div>
+
+      <div className="chooser-go">
+        {picked.length < 2 && <p className="chooser-hint">Pick at least two competitors.</p>}
+        {ceremony && ceremony.events.length === 0 && (
+          <p className="chooser-hint">
+            No game has enough plays among these players to be a contest
+            {year ? ` in ${year}` : ''}. Try more players, a different mode, or all time.
+          </p>
+        )}
+        {ceremony && ceremony.events.length > 0 && (
+          <button
+            type="button"
+            className="go"
+            onClick={() => onOpen(
+              buildCeremonySlides(ceremony),
+              `awards-${picked.join(',')}-${mode}-${year}`,
+            )}
+          >
+            Start the ceremony
+            <small>
+              {ceremony.events.length} events · {ceremony.standings.length} competitors
+              {ceremony.skipped.length > 0 && ` · ${ceremony.skipped.length} not contested`}
+            </small>
           </button>
         )}
       </div>
@@ -209,6 +309,7 @@ export default function Explore({ raw, year, years, onYearChange, onClose }) {
         </div>
 
         {tab === 'lineups' && <LineupChooser raw={raw} year={year} onOpen={open} />}
+        {tab === 'awards' && <AwardsChooser raw={raw} year={year} onOpen={open} />}
         {tab === 'players' && <PlayerChooser raw={raw} year={year} onOpen={open} />}
         {tab === 'games' && <GameChooser raw={raw} year={year} onOpen={open} />}
       </div>

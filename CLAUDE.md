@@ -54,6 +54,10 @@ duplicating them in a caller.
   every player table in the app computes win rate and average score identically.
   `LINEUP_MODES` is the source of truth for the three lineup filters and their
   wording — the UI renders from it rather than hardcoding labels.
+- `src/lib/awards.js` — the awards ceremony. `buildCeremony` turns each game into an
+  event with medals, points and a stated reason per point, then a table and novelty
+  awards. `AWARD_POINTS` is the default scheme and `opts.points` overrides any of it,
+  so don't hardcode point values in slides — read them off the returned `points`.
 
 Each engine re-runs `prepare(raw)` on every call. That is fine at this data size
 (a 326 KB export) and keeps them independently callable; views memoise on
@@ -140,6 +144,11 @@ them deliberately and update the README's "Notes on the data".
   folded into anyone's losses.
 - **A tie is never broken silently.** `leadersOf` returns every player level at the
   top plus a `tied` flag, and the UI names them all. Don't reduce it to `ranked[0]`.
+  The ceremony follows the same rule: standard competition ranking (1, 1, 3), ties
+  share the medal *and* its full points, and no arbitrary tie-break demotes anyone.
+- **Every ceremony point is traceable.** Each event line carries `reasons`, and their
+  points sum to the line's total. Keep that invariant — it is what makes the final
+  table auditable instead of a black box — and never award points without a reason.
 - **`entries` vs `playCount`** on a role/board/variant bucket: `entries` counts
   player-slots, `playCount` distinct plays. They match for roles (one player per
   role) but not for boards or variants, where the whole table shares one value — so

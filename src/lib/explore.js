@@ -3,9 +3,19 @@ import { prepare, inYear, bump, topN, safeJson } from './stats.js';
 
 const MIN_PLAYS_FOR_RANKING = 2; // below this a win rate is noise, not a record
 
-function scoreOf(s) {
+export function scoreOf(s) {
   const n = Number(s.score);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Whether a game's scores carry information. Games won by a condition rather
+ * than points log mostly blanks and zeroes while still leaving `noPoints`
+ * false, and averaging those produces nonsense. Defined once, used by the game
+ * card and the awards ceremony alike.
+ */
+export function scoresLookMeaningful(realScores, entries) {
+  return entries > 0 && realScores >= entries / 2;
 }
 
 export const LINEUP_MODES = [
@@ -39,7 +49,7 @@ function attendeesFrom(play, ids) {
  * - 'subset'   — no outsiders, but any two or more of ids counts
  * - 'exactly'  — all of ids and nobody else
  */
-function matchesLineup(play, ids, mode) {
+export function matchesLineup(play, ids, mode) {
   const { at, selected } = attendeesFrom(play, ids);
   if (mode === 'subset') return selected.length >= 2 && selected.length === at.length;
   const hasAll = selected.length === ids.length;
@@ -510,7 +520,8 @@ export function buildGameCard(raw, gameId, opts = {}) {
      * rather than points (LOTR: Duel) log mostly blanks and zeroes while still
      * leaving `noPoints` false, and averaging those produces nonsense.
      */
-    scoresMeaningful: scoresCount && coverage.realScores >= coverage.entries / 2,
+    scoresMeaningful: scoresCount
+      && scoresLookMeaningful(coverage.realScores, coverage.entries),
     coverage,
     roles,
     roleRanking: rankBuckets(roles),

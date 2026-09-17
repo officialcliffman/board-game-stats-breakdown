@@ -59,6 +59,28 @@ over their own plays within that set, so the plays column varies by row.
 The resulting deck covers the group's leader, standings, a versus bar per pair, which
 slices of the group actually turn up, what they play, and where.
 
+**Awards** — an awards ceremony for the group. Every game becomes an event, medals go
+on win rate within the group, and the ceremony works up from the least-played game to
+the most-played, with no running totals until the podium.
+
+| | |
+| --- | --- |
+| 🥇 Gold | +5 |
+| 🥈 Silver | +3 |
+| 🥉 Bronze | +1 |
+| Highest score in a game | +2 |
+| Lowest score in a game | −1 |
+
+A medal needs at least two plays of that game, so one lucky night can't take gold;
+players below that show on the event with their record and the reason they're not
+eligible. Score bonuses are open to anyone who played it, and unscored games award
+none at all. Level win rates share the medal and its full points, and the places
+behind them are skipped (1, 1, 3). Games nobody played twice aren't a contest and are
+listed as not contested rather than quietly dropped. Every point on screen carries the
+reason it was awarded, so the final table is auditable. It closes with novelty awards
+— The Grinder, The Bridesmaid, Glass Cannon, The Wooden Spoon — each omitted unless it
+genuinely has a holder.
+
 **Players** — a card each: win-rate ring, strongest and weakest game, most played, and
 the per-game table. Best and worst are by win rate across games played at least twice,
 so one lucky game can't top the list; anyone below that threshold is flagged as
@@ -82,12 +104,16 @@ quietly picking one of them.
 - `src/lib/explore.js` — the drill-down engines: `buildLineup`, `buildPlayerCards`,
   `buildGameCard`, and `activePlayers`/`playedGames` for the pickers. Built on the same
   `prepare`, so indexing and the duration heuristic are defined once.
+- `src/lib/awards.js` — the ceremony. `buildCeremony` returns events, a points table
+  and the novelty awards; `AWARD_POINTS` holds the scheme and can be overridden per
+  call, so a different scoring system is one argument rather than a rewrite.
 - `src/Deck.jsx` — the slide shell: gradients, progress bar, keyboard/click/swipe
   navigation. Anything expressible as slides gets the story treatment through here.
 - `src/slides.jsx` — the main breakdown's slides. Each is `{ id, theme, render }`; a
   falsy entry is filtered out when its data is missing.
 - `src/exploreSlides.jsx` — the same shape for each drill-down: `buildLineupSlides`,
   `buildPlayerSlides`, `buildGameSlides`.
+- `src/awardSlides.jsx` — `buildCeremonySlides`, the ceremony as a deck.
 - `src/Explore.jsx` — the chooser, and the mini-deck it launches.
 - `src/App.jsx` — file loading, year selection, deck vs chooser.
 - `src/ui.jsx` — formatters and the visual primitives: `Avatar`, `Donut`, `VsBar`,

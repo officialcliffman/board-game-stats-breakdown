@@ -329,6 +329,57 @@ export function buildPlayerCards(raw, opts = {}) {
     .sort((a, b) => b.plays - a.plays);
 }
 
+/**
+ * Pull the interesting flags out of a play's scoresheet blob.
+ *
+ * BG Stats stores the sheet as a JSON string of groups of rows. Row `type`
+ * tells us what a row means:
+ * - `radioOverall` — a way to win the whole game (LOTR: Duel's "Quest of the
+ *   Ring", Splendor Duel's "Win: 10+ Crowns"). The winner's score uuid appears
+ *   in the row.
+ * - `radio` / `checkbox` — an in-game achievement, exclusive or not (CATAN's
+ *   Longest Road, Patchwork's 7x7 token).
+ *
+ * Row keys are player score uuids, which we map back via each entry's own
+ * metaData rather than a global uuid table, so anonymous players still resolve.
+ */
+function readScoresheet(play, entries, players) {
+  const sheet = safeJson(play.scoresheet);
+  const out = {
+    conditions: [], achievements: [], conditionLabels: [], hasConditionRows: false,
+  };
+  if (!sheet?.groups) return out;
+
+  const byUuid = new Map();
+  for (const entry of entries) {
+    const uuid = safeJson(entry.metaData)?.scoreUuid;
+    if (uuid) {
+      byUuid.set(uuid, { player: players.get(entry.playerRefId), role: entry.role || null });
+    }
+  }
+
+  for (const group of sheet.groups) {
+    for (const row of group.rows || []) {
+      const type = row.type ?? 'number';
+      if (type !== 'radioOverall' && type !== 'radio' && type !== 'checkbox') continue;
+
+      const claimants = Object.keys(row.scores || {})
+        .map((uuid) => byUuid.get(uuid))
+        .filter((x) => x?.player);
+
+      if (type === 'radioOverall') {
+        out.hasConditionRows = true;
+        // every offered condition, so we can also spot the ones never used
+        out.conditionLabels.push(row.label);
+        if (claimants.length) out.conditions.push({ label: row.label, claimants });
+      } else if (claimants.length) {
+        out.achievements.push({ label: row.label, group: group.label ?? null, claimants });
+      }
+    }
+  }
+  return out;
+}
+
 /** Running score aggregate, for roles/boards/variants. */
 function newScoreBucket(name) {
   return {
@@ -431,6 +482,10 @@ export function buildGameCard(raw, gameId, opts = {}) {
   const roleBuckets = new Map();
   const boardBuckets = new Map();
   const variantBuckets = new Map();
+  const conditionRows = new Map();   // label -> how this game got won
+  const achievementRows = new Map(); // label -> in-game honours claimed
+  const conditionTally = { withRows: 0, marked: 0 };
+  const offeredConditions = new Set(); // including any never actually achieved
   // how completely these optional fields are filled in, so the UI can say so
   const coverage = {
     entries: 0, roleEntries: 0, rolePlays: 0, boardPlays: 0, variantPlays: 0, realScores: 0,
@@ -457,6 +512,38 @@ export function buildGameCard(raw, gameId, opts = {}) {
 
     // board is a play-level field; the variant lives inside the scoresheet blob
     const variant = safeJson(p.scoresheet)?.variantLabel || null;
+
+    const sheet = readScoresheet(p, entries, players);
+    if (sheet.hasConditionRows) {
+      conditionTally.withRows += 1;
+      if (sheet.conditions.length) conditionTally.marked += 1;
+      for (const label of sheet.conditionLabels) offeredConditions.add(label);
+    }
+    for (const cond of sheet.conditions) {
+      if (!conditionRows.has(cond.label)) {
+        conditionRows.set(cond.label, {
+          name: cond.label, plays: 0, byPlayer: new Map(), byRole: new Map(),
+        });
+      }
+      const slot = conditionRows.get(cond.label);
+      slot.plays += 1;
+      for (const { player, role } of cond.claimants) {
+        if (!slot.byPlayer.has(player.id)) slot.byPlayer.set(player.id, { player, count: 0 });
+        slot.byPlayer.get(player.id).count += 1;
+        if (role) bump(slot.byRole, role);
+      }
+    }
+    for (const ach of sheet.achievements) {
+      if (!achievementRows.has(ach.label)) {
+        achievementRows.set(ach.label, { name: ach.label, claims: 0, byPlayer: new Map() });
+      }
+      const slot = achievementRows.get(ach.label);
+      for (const { player } of ach.claimants) {
+        slot.claims += 1;
+        if (!slot.byPlayer.has(player.id)) slot.byPlayer.set(player.id, { player, count: 0 });
+        slot.byPlayer.get(player.id).count += 1;
+      }
+    }
     coverage.entries += entries.length;
     if (entries.some((s) => s.role)) coverage.rolePlays += 1;
     if (p.board) coverage.boardPlays += 1;
@@ -503,6 +590,21 @@ export function buildGameCard(raw, gameId, opts = {}) {
   const roles = finishAll(roleBuckets);
   const boards = finishAll(boardBuckets);
 
+  const rankPeople = (map) => [...map.values()].sort((a, z) => z.count - a.count);
+
+  const conditions = [...conditionRows.values()]
+    .map((c) => ({
+      name: c.name,
+      plays: c.plays,
+      players: rankPeople(c.byPlayer),
+      roles: topN(c.byRole, 10).map(({ key, value }) => ({ role: key, count: value })),
+    }))
+    .sort((a, z) => z.plays - a.plays);
+
+  const achievements = [...achievementRows.values()]
+    .map((a) => ({ name: a.name, claims: a.claims, players: rankPeople(a.byPlayer) }))
+    .sort((a, z) => z.claims - a.claims);
+
   // BG Stats fills variantLabel with the game's own name for most games, which
   // tells you nothing. Keep it only when it actually distinguishes something.
   const allVariants = finishAll(variantBuckets);
@@ -525,6 +627,19 @@ export function buildGameCard(raw, gameId, opts = {}) {
     coverage,
     roles,
     roleRanking: rankBuckets(roles),
+    /** The different ways this game was actually won. */
+    conditions,
+    conditionTally: {
+      ...conditionTally,
+      // plays that offered win conditions but recorded none: decided on points
+      onPoints: conditionTally.withRows - conditionTally.marked,
+      offered: offeredConditions.size,
+    },
+    /** Routes to victory the sheet offers that nobody has managed yet. */
+    unusedConditions: [...offeredConditions]
+      .filter((label) => !conditions.some((c) => c.name === label)),
+    /** In-game honours (Longest Road, 7x7 token) rather than ways to win. */
+    achievements,
     boards,
     boardRanking: rankByScore(boards),
     variants,

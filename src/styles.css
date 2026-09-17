@@ -799,3 +799,18 @@ body {
 }
 
 .chooser-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* ---- win conditions and honours ----------------------------------------- */
+.condition-who { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+
+.condition-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.condition-player em { font-style: normal; font-weight: 800; color: var(--muted); }
+.condition-roles { font-size: 12px; color: var(--faint); }
+.bucket--unused { opacity: 0.55; border: 1px dashed rgba(255, 255, 255, 0.35); background: none; }

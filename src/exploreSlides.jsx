@@ -512,6 +512,103 @@ export function buildGameSlides(card) {
     },
   ].filter(Boolean) : [];
 
+  const { conditionTally: ct } = card;
+  const topCondition = card.conditions[0];
+
+  const conditionSlides = card.conditions.length > 0 ? [
+    {
+      id: 'game-conditions',
+      theme: 'neon',
+      render: () => (
+        <>
+          <p className="eyebrow">Ways to win</p>
+          <h2 className="title title--compact">
+            {card.conditions.length === 1
+              ? `Always by ${topCondition.name}`
+              : `Usually by ${topCondition.name}`}
+          </h2>
+          <div className="buckets">
+            {card.conditions.map((c) => (
+              <div className="bucket" key={c.name}>
+                <span className="bucket-head">
+                  <strong>{c.name}</strong>
+                  <small>{c.plays} {c.plays === 1 ? 'win' : 'wins'}</small>
+                </span>
+                <span className="condition-who">
+                  {c.players.map((p) => (
+                    <span className="condition-player" key={p.player.id}>
+                      <Avatar player={p.player} size={26} />
+                      {p.player.name}
+                      {p.count > 1 && <em>×{p.count}</em>}
+                    </span>
+                  ))}
+                </span>
+                {c.roles.length > 0 && (
+                  <small className="condition-roles">
+                    as {c.roles.map((r) => `${r.role}${r.count > 1 ? ` ×${r.count}` : ''}`).join(', ')}
+                  </small>
+                )}
+              </div>
+            ))}
+            {card.unusedConditions.map((name) => (
+              <div className="bucket bucket--unused" key={name}>
+                <span className="bucket-head">
+                  <strong>{name}</strong>
+                  <small>never</small>
+                </span>
+                <small className="bucket-empty">nobody has won this way yet</small>
+              </div>
+            ))}
+          </div>
+          <p className="footnote">
+            From the {ct.marked} of {ct.withRows} {ct.withRows === 1 ? 'play' : 'plays'} with a
+            winning condition recorded.
+            {ct.onPoints > 0 && ` The other ${ct.onPoints} ${ct.onPoints === 1 ? 'was' : 'were'} decided on points.`}
+          </p>
+        </>
+      ),
+    },
+  ] : [];
+
+  const achievementSlides = card.achievements.length > 0 ? [
+    {
+      id: 'game-achievements',
+      theme: 'sunset',
+      render: () => (
+        <>
+          <p className="eyebrow">Honours</p>
+          <h2 className="title title--compact">
+            {card.achievements[0].players[0]
+              ? `${card.achievements[0].players[0].player.name} owns ${card.achievements[0].name}`
+              : 'Claimed along the way'}
+          </h2>
+          <div className="buckets">
+            {card.achievements.map((a) => (
+              <div className="bucket" key={a.name}>
+                <span className="bucket-head">
+                  <strong>{a.name}</strong>
+                  <small>{a.claims} {a.claims === 1 ? 'time' : 'times'}</small>
+                </span>
+                <span className="condition-who">
+                  {a.players.map((p) => (
+                    <span className="condition-player" key={p.player.id}>
+                      <Avatar player={p.player} size={26} />
+                      {p.player.name}
+                      {p.count > 1 && <em>×{p.count}</em>}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="footnote">
+            In-game honours rather than ways to win — bonuses the scoresheet tracks.
+          </p>
+        </>
+      ),
+    },
+  ] : [];
+
   const bucketSlides = [
     card.boards.length > 0 && {
       id: 'game-boards',
@@ -688,7 +785,9 @@ export function buildGameSlides(card) {
         </>
       ),
     },
+    ...conditionSlides,
     ...roleSlides,
+    ...achievementSlides,
     ...bucketSlides,
     card.locations.length > 1 && {
       id: 'game-where',

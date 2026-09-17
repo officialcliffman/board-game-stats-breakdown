@@ -119,6 +119,14 @@ Facts that are easy to get wrong and expensive to debug:
   (Critter Kitchen, Harmonies). Don't assume it implies asymmetry.
 - `board` is a play-level string, and the variant lives at `scoresheet.variantLabel`
   — which usually just repeats the game's name and has to be filtered.
+- The `scoresheet` blob is where win conditions live. `readScoresheet` in `explore.js`
+  is the only place that parses it; extend that rather than re-parsing elsewhere. Row
+  `type` carries the meaning: `radioOverall` is a way to win the whole game,
+  `radio`/`checkbox` are in-game honours (Longest Road), `ignoredForTotal` holds a
+  tracked value, and absent means a plain number. **Don't conflate an honour with a
+  win condition** — they render as separate slides for that reason.
+- Scoresheet rows are keyed by *player score uuid*, not player id. Resolve via each
+  `playerScores[].metaData.scoreUuid`, which keeps anonymous players working.
 - `durationMin: 0` means untimed, not instant — roughly half of real plays.
 - `plays[].ignored` plays are excluded everywhere.
 

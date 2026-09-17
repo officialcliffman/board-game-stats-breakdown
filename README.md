@@ -89,6 +89,13 @@ provisional.
 **Games** — everyone's record in one game: champion, wins, average/best/worst scores,
 the player-count split, locations, and how often the start player went on to win.
 
+Games with more than one route to victory get a **ways to win** slide: which
+conditions actually decided games, who managed each, and — when roles exist — which
+role pulled it off. Conditions the scoresheet offers but nobody has ever achieved are
+shown as unclaimed, because that is the interesting part. Games that track in-game
+honours rather than win conditions (CATAN's Largest Army, Patchwork's 7x7 token) get a
+separate **honours** slide, kept distinct so a bonus is never mistaken for a way to win.
+
 Where a game records **roles**, it also gets a win rate per role and points per role
 (Sauron vs The Fellowship at LOTR: Duel comes out 4–5; Owl is the best Harmonies
 spirit at 50%). Where plays record a **board** or a **variant**, each gets its average,
@@ -151,6 +158,12 @@ gradient.
   When no role clears the threshold, the ranking is dropped and all roles read equally.
 - `variantLabel` usually just repeats the game's own name, so it's only shown when it
   actually distinguishes something.
+- Win conditions and honours come out of the `scoresheet` blob, by row `type`:
+  `radioOverall` is a way to win the whole game, while `radio` and `checkbox` are
+  in-game bonuses. Rows are keyed by player score uuid, resolved through each entry's
+  own `metaData`. Not every play fills them in — LOTR: Duel records a condition on 7
+  of 9 plays, the other two having been decided on points — so the slide says how many
+  it is speaking for.
 
 ## Ideas for next
 

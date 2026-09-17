@@ -1,0 +1,6 @@
+node_modules
+dist
+*.local
+
+# personal play data — keep local, it names real people and places
+BGStatsExport*.json
